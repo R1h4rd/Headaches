@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Headache Log</title>
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Headaches">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  /* VOICE calm, clinical diary · IDEA a pocket symptom diary · PICTURE today card + month grid shaded by pain
+     COLOUR habits-app neutrals, teal for clear days, amber→crimson for intensity · TYPE system UI · LAYOUT one column */
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #6f6f76; --line: #e6e4df;
+    --empty: #ecebe7; --clear: #2f7d5b; --accent: #2f7d5b; --danger: #c2453d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --card: #1e1e21; --ink: #f2f2f3; --muted: #9a9aa2; --line: #2c2c31; --empty: #2a2a2f; --clear: #4fb488; --accent: #4fb488; --danger: #e0675f; }
+  }
+  :root[data-theme=light] { --bg: #f6f5f2; --card: #fff; --ink: #1d1d1f; --muted: #6f6f76; --line: #e6e4df; --empty: #ecebe7; --clear: #2f7d5b; --accent: #2f7d5b; --danger: #c2453d; }
+  :root[data-theme=dark] { --bg: #141416; --card: #1e1e21; --ink: #f2f2f3; --muted: #9a9aa2; --line: #2c2c31; --empty: #2a2a2f; --clear: #4fb488; --accent: #4fb488; --danger: #e0675f; }
+  * { box-sizing: border-box; min-width: 0; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow-x: clip; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px max(40px, env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; gap: 12px; }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; line-height: 1.1; }
+  .date { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .badge { text-align: right; font-size: 13px; color: var(--muted); }
+  .badge strong { display: block; font-size: 26px; color: var(--clear); line-height: 1; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .q { font-weight: 600; font-size: 17px; margin-bottom: 12px; }
+  .yn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .yn button { min-height: 52px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); color: var(--ink);
+               font: inherit; font-weight: 600; cursor: pointer; transition: transform .1s, background .15s; }
+  .yn button:active { transform: scale(.97); }
+  .yn button.selNo { background: var(--clear); border-color: var(--clear); color: #fff; }
+  .yn button.selYes { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .lvl { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 14px; }
+  .lvl button { aspect-ratio: 1; min-height: 30px; border: 0; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 700;
+                cursor: pointer; background: var(--empty); color: var(--muted); padding: 0; }
+  .lvl button.sel { color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+  .lvlhint { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .note { width: 100%; margin-top: 12px; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+          border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: none; }
+  .clear { margin-top: 10px; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 6px 0; }
+  .week { display: flex; gap: 6px; }
+  .day { flex: 1; text-align: center; font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
+  .day b { display: grid; place-items: center; height: 32px; border-radius: 8px; background: var(--empty); margin-top: 4px; color: #fff; font-size: 12px; }
+  .day.today { color: var(--ink); font-weight: 600; }
+  .day.future { opacity: .35; cursor: default; }
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
+  .stat strong { display: block; font-size: 22px; }
+  .stat small { color: var(--muted); font-size: 12px; }
+  .mhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .mhead h2 { font-size: 16px; margin: 0; }
+  .nav { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .nav:disabled { opacity: .3; cursor: default; }
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .wd { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 2px; }
+  .cell { aspect-ratio: 1; border-radius: 7px; background: var(--empty); cursor: pointer; display: grid; place-items: center;
+          font-size: 12px; color: var(--muted); position: relative; }
+  .cell.has { color: #fff; font-weight: 600; }
+  .cell.blank { visibility: hidden; }
+  .cell.future { opacity: .3; cursor: default; }
+  .cell.today { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .cell i { position: absolute; top: 3px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .8; }
+  .legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .legend span { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+  .bar { display: grid; grid-template-columns: 2.2em 1fr 2em; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .bar div { height: 14px; border-radius: 4px; background: var(--empty); overflow: hidden; }
+  .bar div span { display: block; height: 100%; border-radius: 4px; }
+  .bar em { font-style: normal; text-align: right; color: var(--ink); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.txt { background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 10px 14px; font: inherit; font-size: 14px; cursor: pointer; min-height: 44px; }
+  button.txt.danger { color: var(--danger); border-color: var(--danger); }
+  .status { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: 10px; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .sheet-bg.open { display: flex; }
+  .sheet { background: var(--card); width: 100%; max-width: 560px; border-radius: 20px 20px 0 0; padding: 20px 16px max(28px, env(safe-area-inset-bottom)); max-height: 92vh; overflow-y: auto; }
+  .sheet h2 { margin: 0 0 14px; font-size: 18px; }
+  .sheet p { color: var(--muted); margin: 0 0 16px; }
+  .sheet textarea.dump { width: 100%; height: 160px; font: 12px/1.4 ui-monospace, monospace; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btns button { flex: 1; padding: 12px; min-height: 48px; border-radius: 12px; font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .btns button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btns button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Headaches</h1>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="badge" id="badge"></div>
+  </header>
+
+  <div class="card" id="today"></div>
+
+  <div class="card">
+    <div class="week" id="week"></div>
+  </div>
+
+  <div class="card">
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <div class="mhead">
+      <button class="nav" id="prev" aria-label="Previous month">‹</button>
+      <h2 id="mtitle"></h2>
+      <button class="nav" id="next" aria-label="Next month">›</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card">
+    <div class="q" style="font-size:15px">Intensity, last 90 days</div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="txt" id="exportBtn">Export backup</button>
+      <button class="txt" id="importBtn">Import backup</button>
+      <span style="flex:1"></span>
+      <button class="txt danger" id="wipeBtn">Erase all</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<input type="file" id="file" accept="application/json,.json" hidden>
+
+<script>
+{
+const LS_KEY = 'headache-log-v1';
+const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+// log: { 'YYYY-MM-DD': 0 (no headache) | 1..10 (intensity) }, notes: { 'YYYY-MM-DD': 'text' }
+let state = { log: {}, notes: {} };
+let month = null; // Date at the 1st of the shown month
+
+// ---------- dates ----------
+const pad = n => String(n).padStart(2, '0');
+const key = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const fromKey = k => new Date(k + 'T00:00:00');
+const fmtDay = k => fromKey(k).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+
+// ---------- colours ----------
+// 1 = pale amber → 10 = deep crimson
+function painColor(v) {
+  const t = (v - 1) / 9;
+  const h = 42 - 42 * t, s = 85, l = 58 - 22 * t;
+  return `hsl(${h.toFixed(0)} ${s}% ${l.toFixed(0)}%)`;
+}
+const colorFor = v => v === undefined ? '' : v === 0 ? 'var(--clear)' : painColor(v);
+
+// ---------- stats ----------
+const val = k => state.log[k];
+function clearStreak() {
+  let d = today(), n = 0;
+  if (val(key(d)) === undefined) d = addDays(d, -1); // unlogged today doesn't break the streak
+  while (val(key(d)) === 0) { n++; d = addDays(d, -1); }
+  return n;
+}
+function longestClear() {
+  const keys = Object.keys(state.log).sort();
+  if (!keys.length) return 0;
+  let best = 0, run = 0;
+  for (let d = fromKey(keys[0]), t = today(); d <= t; d = addDays(d, 1)) {
+    run = val(key(d)) === 0 ? run + 1 : 0;
+    best = Math.max(best, run);
+  }
+  return best;
+}
+function window30() {
+  let logged = 0, hd = 0, sum = 0, max = 0;
+  for (let i = 0; i < 30; i++) {
+    const v = val(key(addDays(today(), -i)));
+    if (v === undefined) continue;
+    logged++;
+    if (v > 0) { hd++; sum += v; max = Math.max(max, v); }
+  }
+  return { logged, hd, avg: hd ? (sum / hd).toFixed(1) : '–', max };
+}
+
+// ---------- storage ----------
+const status = t => document.getElementById('status').textContent = t;
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { status('Couldn’t save on this device — storage may be blocked or full.'); }
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s && s.log) state = { log: s.log, notes: s.notes || {} };
+  } catch (e) {}
+}
+
+// ---------- actions ----------
+function setDay(k, v) {
+  if (k > key(today())) return;
+  if (v === null) { delete state.log[k]; delete state.notes[k]; }
+  else state.log[k] = v;
+  save(); render();
+}
+function setNote(k, text) {
+  text = text.trim().slice(0, 300);
+  if (text) state.notes[k] = text; else delete state.notes[k];
+  save();
+}
+
+// ---------- render ----------
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function entryHtml(k, ctx) {
+  const v = val(k), yes = v > 0;
+  return `
+    <div class="q">${ctx === 'today' ? 'Headache today?' : 'Headache this day?'}</div>
+    <div class="yn">
+      <button data-set="0" data-k="${k}" class="${v === 0 ? 'selNo' : ''}">No headache</button>
+      <button data-set="yes" data-k="${k}" class="${yes ? 'selYes' : ''}">Headache</button>
+    </div>
+    ${yes ? `
+      <div class="lvl">${Array.from({ length: 10 }, (_, i) => i + 1).map(n =>
+        `<button data-set="${n}" data-k="${k}" class="${v === n ? 'sel' : ''}" style="${v === n ? `background:${painColor(n)}` : `color:${painColor(n)}`}" aria-label="Intensity ${n}">${n}</button>`).join('')}</div>
+      <div class="lvlhint"><span>1 · mild</span><span>10 · worst</span></div>` : ''}
+    ${v !== undefined ? `
+      <textarea class="note" rows="2" maxlength="300" data-note="${k}" placeholder="Note (optional) — e.g. took ibuprofen, poor sleep">${esc(state.notes[k] || '')}</textarea>
+      <button class="clear" data-set="clear" data-k="${k}">Clear this day</button>` : ''}`;
+}
+
+function render() {
+  const t = today(), tk = key(t);
+  document.getElementById('date').textContent = t.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const streak = clearStreak();
+  document.getElementById('badge').innerHTML = `<strong>${streak}</strong>day${streak === 1 ? '' : 's'} clear`;
+
+  // keep focus/caret if the user is typing in today's note
+  const todayCard = document.getElementById('today');
+  if (!todayCard.contains(document.activeElement) || document.activeElement.tagName !== 'TEXTAREA') todayCard.innerHTML = entryHtml(tk, 'today');
+
+  // this week
+  const monday = addDays(t, -((t.getDay() + 6) % 7));
+  let week = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(monday, i), k = key(d), v = val(k), fut = d > t;
+    week += `<div class="day ${k === tk ? 'today' : ''} ${fut ? 'future' : ''}" ${fut ? '' : `data-open="${k}"`}>${WEEKDAYS[i]}<b style="${v !== undefined ? `background:${colorFor(v)}` : ''}">${v > 0 ? v : ''}</b></div>`;
+  }
+  document.getElementById('week').innerHTML = week;
+
+  // stats
+  const w = window30();
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><strong>${w.hd}</strong><small>Headache days, last 30</small></div>
+    <div class="stat"><strong>${w.avg}</strong><small>Avg intensity, last 30</small></div>
+    <div class="stat"><strong>${streak}</strong><small>Current clear streak</small></div>
+    <div class="stat"><strong>${longestClear()}</strong><small>Longest clear streak</small></div>
+    ${w.logged < 30 ? `<div style="grid-column:1/-1;font-size:12px;color:var(--muted);text-align:center">${w.logged} of the last 30 days logged</div>` : ''}`;
+
+  // month grid
+  if (!month) month = new Date(t.getFullYear(), t.getMonth(), 1);
+  document.getElementById('mtitle').textContent = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  document.getElementById('next').disabled = month.getFullYear() === t.getFullYear() && month.getMonth() === t.getMonth();
+  const lead = (month.getDay() + 6) % 7;
+  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  let cells = WEEKDAYS.map(x => `<div class="wd">${x}</div>`).join('');
+  for (let i = 0; i < lead; i++) cells += '<div class="cell blank"></div>';
+  let mHd = 0;
+  for (let n = 1; n <= days; n++) {
+    const d = new Date(month.getFullYear(), month.getMonth(), n), k = key(d), v = val(k), fut = d > t;
+    if (v > 0) mHd++;
+    cells += `<div class="cell ${v !== undefined ? 'has' : ''} ${fut ? 'future' : ''} ${k === tk ? 'today' : ''}" ${fut ? '' : `data-open="${k}"`}
+      style="${v !== undefined ? `background:${colorFor(v)}` : ''}" title="${v > 0 ? 'Intensity ' + v : v === 0 ? 'No headache' : ''}">${n}${state.notes[k] ? '<i></i>' : ''}</div>`;
+  }
+  document.getElementById('grid').innerHTML = cells;
+  document.getElementById('legend').innerHTML =
+    `<span style="background:var(--clear)"></span> clear
+     <span style="background:${painColor(1)};margin-left:8px"></span><span style="background:${painColor(4)}"></span><span style="background:${painColor(7)}"></span><span style="background:${painColor(10)}"></span> 1 → 10
+     <span style="background:var(--empty);margin-left:8px"></span> not logged
+     <b style="margin-left:auto;color:var(--ink);font-weight:600">${mHd} headache day${mHd === 1 ? '' : 's'}</b>`;
+
+  // intensity distribution, last 90 days
+  const counts = Array(11).fill(0);
+  for (let i = 0; i < 90; i++) { const v = val(key(addDays(t, -i))); if (v !== undefined) counts[v]++; }
+  const mx = Math.max(1, ...counts);
+  document.getElementById('bars').innerHTML = counts.map((c, v) => `
+    <div class="bar"><span>${v === 0 ? 'Clear' : v}</span><div><span style="width:${(c / mx * 100).toFixed(1)}%;background:${colorFor(v)}"></span></div><em>${c}</em></div>`).join('');
+}
+
+// ---------- sheet ----------
+const sheetBg = document.getElementById('sheetBg'), sheet = document.getElementById('sheet');
+let sheetKey = null;
+function closeSheet() { sheetBg.classList.remove('open'); sheetKey = null; render(); }
+function openDay(k) {
+  if (k === key(today())) { document.getElementById('today').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  sheetKey = k; drawSheet(); sheetBg.classList.add('open');
+}
+function drawSheet() {
+  sheet.innerHTML = `<h2>${fmtDay(sheetKey)}</h2>${entryHtml(sheetKey, 'sheet')}
+    <div class="btns"><button class="primary" id="done">Done</button></div>`;
+  document.getElementById('done').onclick = closeSheet;
+}
+sheetBg.addEventListener('click', e => { if (e.target === sheetBg) closeSheet(); });
+
+// ---------- events ----------
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-set]');
+  if (s) {
+    const k = s.dataset.k, a = s.dataset.set;
+    if (a === 'clear') setDay(k, null);
+    else if (a === 'yes') setDay(k, val(k) > 0 ? val(k) : 5);
+    else setDay(k, Number(a));
+    if (sheetKey === k) drawSheet();
+    return;
+  }
+  const o = e.target.closest('[data-open]');
+  if (o) openDay(o.dataset.open);
+});
+document.addEventListener('input', e => { if (e.target.dataset.note) setNote(e.target.dataset.note, e.target.value); });
+document.getElementById('prev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
+document.getElementById('next').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
+
+// export / import
+document.getElementById('exportBtn').onclick = () => {
+  const json = JSON.stringify(state, null, 1);
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = `headache-log-${key(today())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (err) {}
+  sheet.innerHTML = `<h2>Backup</h2><p>If no file was downloaded, copy this text and keep it somewhere safe.</p>
+    <textarea class="dump" readonly>${esc(json)}</textarea>
+    <div class="btns"><button id="copy">Copy</button><button class="primary" id="done">Done</button></div>`;
+  sheetBg.classList.add('open');
+  document.getElementById('done').onclick = closeSheet;
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(json); document.getElementById('copy').textContent = 'Copied'; }
+    catch (err) { sheet.querySelector('.dump').select(); }
+  };
+};
+function importJson(text) {
+  try {
+    const s = JSON.parse(text);
+    if (!s || typeof s.log !== 'object') throw 0;
+    const log = {};
+    for (const [k, v] of Object.entries(s.log)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isInteger(v) && v >= 0 && v <= 10) log[k] = v;
+    const notes = {};
+    for (const [k, v] of Object.entries(s.notes || {})) if (log[k] !== undefined && typeof v === 'string') notes[k] = v.slice(0, 300);
+    state = { log, notes }; save(); render();
+    status(`Imported ${Object.keys(log).length} days.`);
+    return true;
+  } catch (err) { status('That file isn’t a headache-log backup.'); return false; }
+}
+document.getElementById('importBtn').onclick = () => {
+  sheet.innerHTML = `<h2>Import backup</h2><p>This replaces everything currently logged. Pick a backup file, or paste its text below.</p>
+    <textarea class="dump" id="paste" placeholder='{"log": {...}}'></textarea>
+    <div class="btns"><button id="pick">Choose file</button><button class="primary" id="go">Import pasted</button></div>`;
+  sheetBg.classList.add('open');
+  document.getElementById('pick').onclick = () => document.getElementById('file').click();
+  document.getElementById('go').onclick = () => { if (importJson(document.getElementById('paste').value)) closeSheet(); };
+};
+document.getElementById('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (importJson(await f.text())) closeSheet();
+  e.target.value = '';
+};
+document.getElementById('wipeBtn').onclick = () => {
+  sheet.innerHTML = `<h2>Erase all entries?</h2><p>Every logged day and note will be removed from this device. Export a backup first if you might want them. This can’t be undone.</p>
+    <div class="btns"><button id="cancel">Cancel</button><button class="danger" id="ok">Erase</button></div>`;
+  sheetBg.classList.add('open');
+  document.getElementById('cancel').onclick = closeSheet;
+  document.getElementById('ok').onclick = () => { state = { log: {}, notes: {} }; save(); closeSheet(); };
+};
+
+// re-render after midnight / when the app comes back to the foreground
+let lastDay = key(today());
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && key(today()) !== lastDay) { lastDay = key(today()); month = null; render(); }
+});
+
+load();
+render();
+
+// offline support (works when hosted over https; ignored where service workers aren't allowed)
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
+</script>
+</body>
+</html>
